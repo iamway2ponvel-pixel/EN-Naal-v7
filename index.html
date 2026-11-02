@@ -131,7 +131,6 @@ html.locked .app,html.locked .tabs{visibility:hidden}
 <div class="field"><label for="startDate">கடன் தொடங்கிய தேதி (வட்டிக்கு)</label><input id="startDate" type="date"></div>
 <div class="field"><label for="intDay">வட்டி கட்டும் நாள் (மாதத்தில்)</label><input id="intDay" type="number" min="1" max="31" inputmode="numeric" placeholder="எ.கா. 21"></div>
 </div>
-<div class="field"><label for="upiId">பெறுபவர் UPI ID (விருப்பம்)</label><input id="upiId" type="text" autocapitalize="none" autocomplete="off" placeholder="எ.கா. name@okicici"></div>
 <button class="btn primary" id="saveDebtBtn" type="button" style="margin-top:4px">✅ சேமி - கடனை சேர்</button>
 <p id="formMsg" style="margin:0;font-size:.85rem;color:#B42318;display:none"></p>
 </div>
@@ -227,15 +226,17 @@ html.locked .app,html.locked .tabs{visibility:hidden}
 <div class="field"><label for="payDate">தேதி</label><input id="payDate" type="date"></div>
 <label class="check"><input type="checkbox" id="payLink" checked> <span id="payLinkText">வரவு-செலவிலும் தானாகப் பதிவு செய்</span></label>
 <div id="upiBox" class="upi-box" hidden>
-<div style="font-weight:700">📲 UPI ஆப் மூலம் செலுத்து</div>
-<div class="field"><label for="payUpi">பெறுபவர் UPI ID</label><input id="payUpi" type="text" autocapitalize="none" autocomplete="off" placeholder="name@bank"></div>
+<div style="font-weight:700">📲 செலுத்தும் ஆப்பைத் தேர்ந்தெடுங்கள்</div>
 <div class="upi-grid">
 <button class="btn small" data-upi="gpay" type="button">Google Pay</button>
 <button class="btn small" data-upi="phonepe" type="button">PhonePe</button>
 <button class="btn small" data-upi="paytm" type="button">Paytm</button>
+<button class="btn small" data-upi="bhim" type="button">BHIM</button>
+<button class="btn small" data-upi="amazon" type="button">Amazon Pay</button>
 <button class="btn small" data-upi="any" type="button">மற்ற UPI ஆப்கள்</button>
 </div>
-<p class="muted" id="upiHint" style="margin:0">மேலே தொகையை எழுதி, ஆப்பைத் தொடுங்கள். செலுத்தி முடித்ததும் இங்கே திரும்பி "சேமி" அழுத்துங்கள்.</p>
+<div class="field"><label for="payUpi">பெறுபவர் UPI ID (தெரிந்தால் மட்டும்)</label><input id="payUpi" type="text" autocapitalize="none" autocomplete="off" placeholder="name@bank"></div>
+<p class="muted" id="upiHint" style="margin:0">UPI ID எழுதினால் தொகையுடன் நேரடியாகப் பணம் செலுத்தும் திரை திறக்கும். எழுதாவிட்டால் Google Pay / PhonePe / Paytm ஆப் மட்டும் திறக்கும்; தொகை நகலெடுக்கப்படும்.</p>
 <a id="upiGo" hidden rel="noopener">upi</a>
 </div>
 <div style="display:flex;gap:8px"><button class="btn primary" id="paySave" type="button">சேமி</button><button class="btn" id="payCancel" type="button">ரத்து</button></div>
@@ -259,7 +260,6 @@ html.locked .app,html.locked .tabs{visibility:hidden}
 <div class="field"><label for="eStart">கடன் தொடங்கிய தேதி</label><input id="eStart" type="date"></div>
 <div class="field"><label for="eIntDay">வட்டி கட்டும் நாள்</label><input id="eIntDay" type="number" min="1" max="31" inputmode="numeric"></div>
 </div>
-<div class="field"><label for="eUpi">பெறுபவர் UPI ID</label><input id="eUpi" type="text" autocapitalize="none" autocomplete="off" placeholder="name@bank"></div>
 </div>
 <div class="field" id="ePhotoWrap"><label for="eFile">📷 புகைப்படம்</label><img id="ePhotoPrev" class="thumb" hidden alt="தற்போதைய படம்"><input id="eFile" type="file" accept="image/*"><label class="check"><input type="checkbox" id="ePhotoDel"> <span>படத்தை நீக்கு</span></label></div>
 <p id="editMsg" style="margin:0;font-size:.85rem;color:#B42318;display:none"></p>
@@ -393,12 +393,16 @@ function dateNotices(d){
   if(d.date){const n=daysUntil(d.date);if(n!==null)rows.push(`<div class="row notice-row"><span>⏳ ${d.type==='owe'?'கொடுக்க வேண்டிய':'வர வேண்டிய'} கடைசி தேதி: <b>${escapeHtml(d.date)}</b></span><span>${dayWord(n)}</span></div>`);}
   return rows.join('');
 }
+const APPN={gpay:'Google Pay',phonepe:'PhonePe',paytm:'Paytm',bhim:'BHIM',amazon:'Amazon Pay',any:'UPI'};
+const APP_PKG={bhim:'in.org.npci.upiapp',amazon:'in.amazon.mShop.android.shopping'};
 function upiUrl(app,vpa,name,amount){
   const ascii=s=>/^[\x20-\x7E]*$/.test(s)&&s.trim()?s.trim():'Payee';
   const q='pa='+encodeURIComponent(vpa)+'&pn='+encodeURIComponent(ascii(name))+'&am='+amount.toFixed(2)+'&cu=INR&tn='+encodeURIComponent('Loan repayment');
+  if(APP_PKG[app])return 'intent://pay?'+q+'#Intent;scheme=upi;package='+APP_PKG[app]+';end';
   const base={gpay:'tez://upi/pay?',phonepe:'phonepe://pay?',paytm:'paytmmp://pay?',any:'upi://pay?'}[app]||'upi://pay?';
   return base+q;
 }
+const appOpenUrl=app=>({gpay:'tez://',phonepe:'phonepe://',paytm:'paytmmp://'}[app]||'');
 function buildChips(box,input,unitSel){
   box.innerHTML='';
   for(let i=1;i<=12;i++){
@@ -628,7 +632,7 @@ function openPay(d){
   $('#payInfo').textContent=`${d.person} - மீதம் ${money(calc(d).remain)} / ${money(d.original)}`;
   $('#payAmount').value='';$('#payDate').value=key(new Date());$('#payLink').checked=true;
   payUpiUsed=null;$('#upiBox').hidden=d.type!=='owe';$('#payUpi').value=d.upiId||'';
-  $('#upiHint').textContent='மேலே தொகையை எழுதி, ஆப்பைத் தொடுங்கள். செலுத்தி முடித்ததும் இங்கே திரும்பி "சேமி" அழுத்துங்கள்.';
+  $('#upiHint').textContent='UPI ID எழுதினால் தொகையுடன் நேரடியாகப் பணம் செலுத்தும் திரை திறக்கும். எழுதாவிட்டால் Google Pay / PhonePe / Paytm ஆப் மட்டும் திறக்கும்; தொகை நகலெடுக்கப்படும்.';
   showModal('payModal');setTimeout(()=>$('#payAmount').focus(),50);
 }
 function openEdit(kind,obj){
@@ -643,7 +647,7 @@ function openEdit(kind,obj){
   $('#eNote').value=obj.note||'';
   $('#eRateWrap').hidden=!isDebt;$('#ePhotoWrap').hidden=isDebt;
   editNewPhoto=null;
-  if(isDebt){$('#eRate').value=obj.rate||'';$('#eRateUnit').value=obj.rateUnit==='year'?'year':'month';$('#eStart').value=obj.start||'';$('#eIntDay').value=obj.intDay||'';$('#eUpi').value=obj.upiId||'';if($('#eRateChips').sync)$('#eRateChips').sync();}
+  if(isDebt){$('#eRate').value=obj.rate||'';$('#eRateUnit').value=obj.rateUnit==='year'?'year':'month';$('#eStart').value=obj.start||'';$('#eIntDay').value=obj.intDay||'';if($('#eRateChips').sync)$('#eRateChips').sync();}
   else{
     $('#eFile').value='';$('#ePhotoDel').checked=false;
     const pv=$('#ePhotoPrev');pv.hidden=true;pv.removeAttribute('src');if(pv.dataset.u){URL.revokeObjectURL(pv.dataset.u);delete pv.dataset.u;}
@@ -663,10 +667,9 @@ function saveEdit(){
     const person=$('#eName').value.trim();
     if(!person)return fail('பெயரை காலியாக விட முடியாது.');
     if(amount<(obj.paidAmount||0))return fail('தொகை ஏற்கெனவே செலுத்திய தொகையைவிடக் குறைவாக இருக்கக்கூடாது.');
-    const upi=$('#eUpi').value.trim();if(upi&&!validUpi(upi))return fail('சரியான UPI ID எழுதுங்கள் (எ.கா. name@bank).');
     const idy=$('#eIntDay').value.trim();if(idy&&!(+idy>=1&&+idy<=31))return fail('வட்டி கட்டும் நாள் 1 முதல் 31 வரை இருக்க வேண்டும்.');
     obj.person=person;obj.original=amount;obj.amount=amount;obj.date=date;obj.note=$('#eNote').value.trim();obj.rate=Math.max(0,parseFloat($('#eRate').value)||0);
-    obj.rateUnit=$('#eRateUnit').value==='year'?'year':'month';obj.start=$('#eStart').value||'';obj.intDay=idy?parseInt(idy,10):0;obj.upiId=upi;
+    obj.rateUnit=$('#eRateUnit').value==='year'?'year':'month';obj.start=$('#eStart').value||'';obj.intDay=idy?parseInt(idy,10):0;
     obj.editedAt=new Date().toISOString();
     obj.history.push({action:'திருத்தம்',date:key(new Date()),time:nowTime(),person:obj.person,original:amount,note:obj.note});
   }else{
@@ -751,7 +754,7 @@ function renderDebtList(){
 <div class="row"><span>தேதி: <b>${escapeHtml(d.date||'-')}</b> · குறிப்பு: ${escapeHtml(d.note||'-')}</span></div>
 ${d.rate>0?`<div class="row"><span>வட்டி: <b>${d.rate}%</b>/${d.rateUnit==='year'?'வருடம்':'மாதம்'} <span class="muted">(≈ ${d.rateUnit==='year'?(d.rate/12).toFixed(2)+'%/மாதம்':(d.rate*12).toFixed(2)+'%/வருடம்'})</span>${ii?` · ${ii.months.toFixed(1)} மாதம் → ≈ <b class="num">${money(ii.interest)}</b>`:''}</span>${ii?`<span class="num">மொத்தம் ≈ ${money(ii.total)}</span>`:''}</div>${ii?'':`<div class="row notice-row"><span class="muted">வட்டித் தொகை கணக்கிட "கடன் தொடங்கிய தேதி"-ஐத் திருத்தி சேர்க்கவும்.</span></div>`}`:''}
 ${dateNotices(d)}
-${d.payments.map(p=>`<div class="row"><span>↳ ${escapeHtml(p.date)} ${d.type==='owe'?'செலுத்தியது':'பெற்றது'}${p.method==='UPI'?' · UPI':''}</span><span class="num">- ${money(p.amount)}</span></div>`).join('')}
+${d.payments.map(p=>`<div class="row"><span>↳ ${escapeHtml(p.date)} ${d.type==='owe'?'செலுத்தியது':'பெற்றது'}${p.method==='UPI'?' · '+(APPN[p.app]||'UPI'):''}</span><span class="num">- ${money(p.amount)}</span></div>`).join('')}
 <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
 ${done?'':`<button class="btn primary small btnPay" type="button">💰 பணம் செலுத்து</button>`}
 ${d.payments.length?`<button class="btn small btnUndo" type="button">↶ கடைசி பதிவு நீக்கு</button>`:''}
@@ -900,14 +903,13 @@ $('#saveDebtBtn').addEventListener('click',()=>{
  if(!person){msgEl.textContent='⚠️ நபர் பெயரை எழுதுங்க';msgEl.style.display='block';$('#person').focus();return;}
  if(isNaN(amount)||amount<=0){msgEl.textContent='⚠️ தொகையை சரியா எழுதுங்க';msgEl.style.display='block';$('#amount').focus();return;}
  const type=$('#typeSel').value;
- const upi=$('#upiId').value.trim(),idy=$('#intDay').value.trim();
- if(upi&&!validUpi(upi)){msgEl.textContent='⚠️ சரியான UPI ID எழுதுங்க (எ.கா. name@bank)';msgEl.style.display='block';$('#upiId').focus();return;}
+ const idy=$('#intDay').value.trim();
  if(idy&&!(+idy>=1&&+idy<=31)){msgEl.textContent='⚠️ வட்டி கட்டும் நாள் 1 முதல் 31 வரை இருக்க வேண்டும்';msgEl.style.display='block';$('#intDay').focus();return;}
- const nd={id:uid(),person,original:amount,amount,paidAmount:0,payments:[],history:[],type,note:$('#note').value.trim(),date:$('#date').value||key(new Date()),rate:Math.max(0,parseFloat($('#rate').value)||0),rateUnit:$('#rateUnit').value==='year'?'year':'month',start:$('#startDate').value||key(new Date()),intDay:idy?parseInt(idy,10):0,upiId:upi};
+ const nd={id:uid(),person,original:amount,amount,paidAmount:0,payments:[],history:[],type,note:$('#note').value.trim(),date:$('#date').value||key(new Date()),rate:Math.max(0,parseFloat($('#rate').value)||0),rateUnit:$('#rateUnit').value==='year'?'year':'month',start:$('#startDate').value||key(new Date()),intDay:idy?parseInt(idy,10):0,upiId:''};
  state.debts.unshift(nd);if(!save())return;
  newDebtId=nd.id;debtFilter=type;
  document.querySelectorAll('[data-debt]').forEach(b=>b.classList.toggle('on',b.dataset.debt===debtFilter));
- $('#person').value='';$('#amount').value='';$('#note').value='';$('#rate').value='';$('#intDay').value='';$('#upiId').value='';$('#startDate').value=key(new Date());$('#rateUnit').value='month';if($('#rateChips').sync)$('#rateChips').sync();$('#filterPaid').value='all';$('#searchPerson').value='';
+ $('#person').value='';$('#amount').value='';$('#note').value='';$('#rate').value='';$('#intDay').value='';$('#startDate').value=key(new Date());$('#rateUnit').value='month';if($('#rateChips').sync)$('#rateChips').sync();$('#filterPaid').value='all';$('#searchPerson').value='';
  renderAll();
  setTimeout(()=>{const el=document.getElementById('debt-'+nd.id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});toast('✅ சேமிக்கப்பட்டது: '+person+' - '+money(amount));},150);
 });
@@ -930,7 +932,7 @@ $('#paySave').addEventListener('click',()=>{
  d.payments.push(p);d.paidAmount=Math.round(((d.paidAmount||0)+amt)*100)/100;
  if($('#payLink').checked){
   const owe=d.type==='owe',label=owe?'கடன் திருப்பம்':'கடன் வசூல்';
-  (owe?state.expenses:state.incomes).unshift({id:uid(),amount:amt,cat:label,note:`${d.person} - ${label}${p.method==='UPI'?' (UPI)':''}`,date,time,linkedPay:p.id});
+  (owe?state.expenses:state.incomes).unshift({id:uid(),amount:amt,cat:label,note:`${d.person} - ${label}${p.method==='UPI'?' ('+(APPN[p.app]||'UPI')+')':''}`,date,time,linkedPay:p.id});
  }
  save();hideModals();renderAll();
  toast(clipped?`மீதத் தொகை ${money(amt)} மட்டும் பதிவாகியது`:'பணம் சேமிக்கப்பட்டது');
@@ -1038,14 +1040,23 @@ buildChips($('#rateChips'),$('#rate'));buildChips($('#eRateChips'),$('#eRate'));
 $('#startDate').value=key(new Date());
 document.querySelectorAll('[data-upi]').forEach(b=>b.addEventListener('click',()=>{
  if(!payTarget)return;
- const amt=parseFloat($('#payAmount').value);if(!(amt>0)){toast('முதலில் தொகையை எழுதுங்க');$('#payAmount').focus();return;}
- const a=Math.min(amt,calc(payTarget).remain),vpa=$('#payUpi').value.trim();
- if(!validUpi(vpa)){toast('சரியான UPI ID எழுதுங்க (எ.கா. name@bank)');$('#payUpi').focus();return;}
- if(vpa!==payTarget.upiId){payTarget.upiId=vpa;save();}
- payUpiUsed=b.dataset.upi;
- const go=$('#upiGo');go.href=upiUrl(payUpiUsed,vpa,payTarget.person,a);go.click();
- $('#upiHint').textContent='UPI ஆப்பில் '+money(a)+' செலுத்தி முடித்ததும் இங்கே திரும்பி "சேமி" அழுத்துங்கள்.';
- setTimeout(()=>{if(!document.hidden)toast('UPI ஆப் திறக்கவில்லையா? வேறு ஆப்பைத் தேர்ந்தெடுக்கவும்');},2200);
+ const app=b.dataset.upi,amt=parseFloat($('#payAmount').value),vpa=$('#payUpi').value.trim(),go=$('#upiGo');
+ const a=amt>0?Math.min(amt,calc(payTarget).remain):0;
+ if(vpa){
+  if(!validUpi(vpa)){toast('சரியான UPI ID எழுதுங்க (எ.கா. name@bank)');$('#payUpi').focus();return;}
+  if(!(a>0)){toast('முதலில் தொகையை எழுதுங்க');$('#payAmount').focus();return;}
+  if(vpa!==payTarget.upiId){payTarget.upiId=vpa;save();}
+  go.href=upiUrl(app,vpa,payTarget.person,a);
+  $('#upiHint').textContent=APPN[app]+'-ல் '+money(a)+' செலுத்தி முடித்ததும் இங்கே திரும்பி "சேமி" அழுத்துங்கள்.';
+ }else{
+  const u=appOpenUrl(app);
+  if(!u){toast(APPN[app]+' தேர்வுக்கு பெறுபவர் UPI ID தேவை. அல்லது Google Pay / PhonePe / Paytm-ஐத் தேர்ந்தெடுக்கவும்.');$('#payUpi').focus();return;}
+  if(a>0&&navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(String(a)).catch(()=>{});
+  go.href=u;
+  $('#upiHint').textContent=APPN[app]+' திறந்ததும் பெறுபவரைத் தேர்ந்தெடுத்து '+(a>0?money(a)+' (தொகை நகலெடுக்கப்பட்டது) ':'')+'செலுத்துங்கள். முடிந்ததும் இங்கே திரும்பி "சேமி" அழுத்துங்கள்.';
+ }
+ payUpiUsed=app;go.click();
+ setTimeout(()=>{if(!document.hidden)toast('ஆப் திறக்கவில்லையா? அது நிறுவப்படாமல் இருக்கலாம்; வேறு ஆப்பைத் தேர்ந்தெடுக்கவும்.');},2200);
 }));
 if(hasPin())openLock('unlock');
 applyLanguage();
